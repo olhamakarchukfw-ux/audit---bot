@@ -101,11 +101,25 @@ export function parseAudit(text) {
   return { analysis, messages: messages.slice(0, 4) };
 }
 
-// Прибирає випадкову markdown-розмітку: у Telegram вона показалася б зірочками.
+// Прибирає зайву розмітку (заголовки, порожні рядки). Жирне **так** лишаємо: його покаже Telegram.
 function cleanup(s) {
   return s
-    .replace(/\*\*(.+?)\*\*/gs, '$1')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// Для Telegram: **слово** → жирне. Решту символів екрануємо, щоб Telegram не зламався на < > &.
+export function toTelegramHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(\S(?:[^*\n]*?\S)?)\*\*/g, '<b>$1</b>')
+    .replace(/\*\*/g, '');
+}
+
+// Для таблиці і запасного надсилання: без зірочок.
+export function toPlainText(text) {
+  return text.replace(/\*\*(\S(?:[^*\n]*?\S)?)\*\*/g, '$1').replace(/\*\*/g, '');
 }

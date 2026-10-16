@@ -4,7 +4,9 @@ import { GrammyError } from 'grammy';
 import { config } from './config.js';
 import { STATUS, nextAuditDue, nextSendDue, updatePerson } from './db.js';
 import { fetchProfile, downloadImage, PageUnreadableError } from './apify.js';
-import { buildProfileContent, buildScreenshotsContent, generateAudit } from './claude.js';
+import {
+  buildProfileContent, buildScreenshotsContent, generateAudit, toTelegramHtml, toPlainText,
+} from './claude.js';
 import { computeSendAt } from './schedule.js';
 import { syncRow, formatKyiv } from './sheets.js';
 import { t, KEYS } from './texts.js';
@@ -94,7 +96,7 @@ async function runAudit(person) {
       sent_parts: 0,
     });
     console.log(`Аудит для @${person.ig} готовий (${messages.length} повідомл.), надсилання ${formatKyiv(sendAt)}`);
-    syncRow(updated, { analysis, text: messages.join('\n\n———\n\n') });
+    syncRow(updated, { analysis: toPlainText(analysis), text: messages.map(toPlainText).join('\n\n———\n\n') });
     if (sendAt <= Date.now()) sendTick();
   } catch (e) {
     if (e instanceof PageUnreadableError) {
@@ -119,13 +121,26 @@ async function runAudit(person) {
   }
 }
 
+// Надсилає з жирним шрифтом; якщо Telegram не прийняв розмітку — надсилає той самий текст без неї.
+async function sendFormatted(chatId, text, extra) {
+  try {
+    return await getApi().sendMessage(chatId, toTelegramHtml(text), { parse_mode: 'HTML', ...extra });
+  } catch (e) {
+    if (e instanceof GrammyError && e.error_code === 400 && /parse|entit/i.test(e.description)) {
+      console.warn('Telegram не прийняв розмітку, надсилаю без неї:', e.description);
+      return getApi().sendMessage(chatId, toPlainText(text), extra);
+    }
+    throw e;
+  }
+}
+
 async function sendAudit(person) {
   const tg = person.tg_id;
   const messages = JSON.parse(person.messages || '[]');
   try {
     for (let i = person.sent_parts || 0; i < messages.length; i++) {
       const last = i === messages.length - 1;
-      await getApi().sendMessage(tg, messages[i], last ? { reply_markup: diagnosticsKeyboard() } : {});
+      await sendFormatted(tg, messages[i], last ? { reply_markup: diagnosticsKeyboard() } : {});
       updatePerson(tg, { sent_parts: i + 1 });
       if (!last) await sleep(2000);
     }
