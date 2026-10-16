@@ -8,6 +8,7 @@ const FILE = fileURLToPath(new URL('../texts/messages.md', import.meta.url));
 export const KEYS = {
   greetingWithNick: 'Привітання (є нік)',
   greetingNoNick: 'Привітання (немає ніка)',
+  nickInvalid: 'Нік не розпізнано',
   pageUnreadable: 'Сторінку не прочитано',
   doneButton: 'Кнопка «Готово»',
   screenshotsReceived: 'Скріншоти отримано',
