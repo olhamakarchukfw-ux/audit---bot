@@ -44,6 +44,14 @@ db.exec(`
   );
 `);
 
+// Нові поля, яких не було в першій версії бази: додаємо, не чіпаючи наявних даних.
+function ensureColumn(table, column, type) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+}
+ensureColumn('people', 'started_at', 'INTEGER');            // коли людина дала нік (від цього рахуємо 2–3 год)
+ensureColumn('people', 'sent_parts', 'INTEGER NOT NULL DEFAULT 0'); // скільки повідомлень аудиту вже надіслано
+
 // Внутрішні статуси і як вони пишуться в Google-таблиці
 export const STATUS = {
   AWAITING_NICK: 'awaiting_nick',
@@ -112,8 +120,26 @@ export function upsertPerson(from) {
 
 const UPDATABLE = new Set([
   'ig', 'status', 'analysis', 'messages', 'screenshots', 'attempts',
-  'next_try_at', 'send_at', 'sent_at',
+  'next_try_at', 'send_at', 'sent_at', 'started_at', 'sent_parts',
 ]);
+
+// Наступна людина, для якої настав час робити аудит
+export function nextAuditDue() {
+  return (
+    db
+      .prepare('SELECT * FROM people WHERE status = ? AND next_try_at <= ? ORDER BY next_try_at LIMIT 1')
+      .get(STATUS.IN_WORK, now()) ?? null
+  );
+}
+
+// Наступний готовий аудит, який пора надсилати
+export function nextSendDue() {
+  return (
+    db
+      .prepare('SELECT * FROM people WHERE status = ? AND send_at <= ? ORDER BY send_at LIMIT 1')
+      .get(STATUS.READY, now()) ?? null
+  );
+}
 
 export function updatePerson(tgId, fields) {
   const keys = Object.keys(fields).filter((k) => UPDATABLE.has(k));

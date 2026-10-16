@@ -8,6 +8,7 @@ requireBotToken();
 const { createStartCode } = await import('./db.js');
 const { normalizeIg } = await import('./nick.js');
 const { bot } = await import('./bot.js');
+const { startWorker } = await import('./audit.js');
 
 // ---------- Веб-сервер ----------
 
@@ -68,6 +69,17 @@ async function startBot() {
   }
 }
 startBot();
+startWorker();
+
+// Попередження в логах, якщо чогось не вистачає (бот при цьому працює).
+for (const [name, value] of [
+  ['ANTHROPIC_API_KEY', config.anthropicKey],
+  ['APIFY_TOKEN', config.apifyToken],
+  ['OWNER_TELEGRAM_ID', config.ownerId],
+  ['SHEETS_WEBHOOK_URL', config.sheetsUrl],
+]) {
+  if (!value) console.warn(`Увага: не задано ${name} у Railway → Variables`);
+}
 
 async function shutdown(signal) {
   console.log(`Отримано ${signal}, зупиняюсь…`);

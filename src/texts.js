@@ -11,6 +11,7 @@ export const KEYS = {
   nickInvalid: 'Нік не розпізнано',
   pageUnreadable: 'Сторінку не прочитано',
   doneButton: 'Кнопка «Готово»',
+  noScreenshotsYet: 'Скріншотів ще немає',
   screenshotsReceived: 'Скріншоти отримано',
   repeatInWork: 'Повторний старт (аудит у роботі)',
   repeatSent: 'Повторний старт (аудит надіслано)',
