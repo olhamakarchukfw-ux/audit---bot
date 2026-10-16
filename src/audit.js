@@ -140,7 +140,9 @@ async function sendAudit(person) {
   try {
     for (let i = person.sent_parts || 0; i < messages.length; i++) {
       const last = i === messages.length - 1;
-      await sendFormatted(tg, messages[i], last ? { reply_markup: diagnosticsKeyboard() } : {});
+      // Перше повідомлення починається із заголовка з texts/messages.md («ТВІЙ АУДИТ ГОТОВИЙ»).
+      const text = i === 0 ? `${t(KEYS.auditHeader, { ig: person.ig })}\n\n${messages[i]}` : messages[i];
+      await sendFormatted(tg, text, last ? { reply_markup: diagnosticsKeyboard() } : {});
       updatePerson(tg, { sent_parts: i + 1 });
       if (!last) await sleep(2000);
     }

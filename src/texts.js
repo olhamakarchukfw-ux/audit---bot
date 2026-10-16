@@ -15,6 +15,7 @@ export const KEYS = {
   screenshotsReceived: 'Скріншоти отримано',
   repeatInWork: 'Повторний старт (аудит у роботі)',
   repeatSent: 'Повторний старт (аудит надіслано)',
+  auditHeader: 'Заголовок аудиту',
   diagnosticsButton: 'Кнопка під аудитом',
   afterDiagnostics: 'Після натискання «Діагностика»',
   freeTextReply: 'Відповідь на вільне повідомлення',
