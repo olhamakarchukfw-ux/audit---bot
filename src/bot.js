@@ -9,7 +9,7 @@ import {
 import { normalizeIg } from './nick.js';
 import { syncRow } from './sheets.js';
 import { startAudit } from './audit.js';
-import { setApi, notifyOwner, personVars, doneKeyboard } from './notify.js';
+import { setApi, notifyOwner, doneKeyboard, shareContactKeyboard } from './notify.js';
 
 export const bot = new Bot(config.botToken);
 setApi(bot.api);
@@ -93,23 +93,22 @@ bot.callbackQuery('screens_done', async (ctx) => {
 bot.callbackQuery('diag', async (ctx) => {
   await ctx.answerCallbackQuery();
   const person = getPerson(ctx.from.id) || upsertPerson(ctx.from);
+  const hasNick = Boolean(person.tg_username);
   if (person.status !== STATUS.DIAGNOSTICS) {
     const updated = updatePerson(person.tg_id, { status: STATUS.DIAGNOSTICS });
     syncRow(updated);
-    let text = t(KEYS.ownerDiagnostics, personVars(updated));
-    let extra = {};
-    if (updated.tg_username) {
-      extra = {
-        reply_markup: {
-          inline_keyboard: [[{ text: t(KEYS.ownerChatButton), url: `https://t.me/${updated.tg_username}` }]],
-        },
-      };
-    } else {
-      text += '\n\n' + t(KEYS.ownerNoTgNick);
-    }
-    await notifyOwner(updated, text, extra);
+    const extra = hasNick
+      ? {
+          reply_markup: {
+            inline_keyboard: [[{ text: t(KEYS.ownerChatButton), url: `https://t.me/${updated.tg_username}` }]],
+          },
+        }
+      : {};
+    await notifyOwner(updated, KEYS.ownerDiagnostics, {}, extra, hasNick ? null : KEYS.ownerNoTgNick);
   }
-  await ctx.reply(t(KEYS.afterDiagnostics));
+  // Без ніка в Telegram просимо поділитися номером (кнопка внизу екрана).
+  if (hasNick) return ctx.reply(t(KEYS.afterDiagnostics));
+  return ctx.reply(t(KEYS.afterDiagnosticsNoNick), { reply_markup: shareContactKeyboard() });
 });
 
 // ---------- Повідомлення ----------
@@ -126,6 +125,17 @@ bot.on('message', async (ctx, next) => {
   } catch (e) {
     await ctx.reply(`Не вдалося надіслати: ${e.description || e.message}`);
   }
+});
+
+// Людина поділилась своїм номером через кнопку «Поділитися номером».
+bot.on('message:contact', async (ctx, next) => {
+  const contact = ctx.message.contact;
+  const person = getPerson(ctx.from.id);
+  if (ctx.chat.type !== 'private' || !person || contact.user_id !== ctx.from.id) return next();
+  const phone = contact.phone_number.startsWith('+') ? contact.phone_number : `+${contact.phone_number}`;
+  updatePerson(person.tg_id, { phone });
+  await ctx.reply(t(KEYS.contactReceived), { reply_markup: { remove_keyboard: true } });
+  await notifyOwner(person, KEYS.ownerPhone, { phone });
 });
 
 bot.on('message', async (ctx, next) => {
@@ -203,7 +213,7 @@ async function forwardToOwner(ctx, person) {
   const m = ctx.message;
   const { forward, reply } = allow(person.tg_id);
   if (forward) {
-    await notifyOwner(person, t(KEYS.ownerForwarded, personVars(person, { text: messageLabel(m) })));
+    await notifyOwner(person, KEYS.ownerForwarded, { text: messageLabel(m) });
     if (!m.text && config.ownerId) {
       try {
         const copied = await ctx.api.copyMessage(config.ownerId, ctx.chat.id, m.message_id);

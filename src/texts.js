@@ -18,7 +18,11 @@ export const KEYS = {
   auditHeader: 'Заголовок аудиту',
   diagnosticsButton: 'Кнопка під аудитом',
   afterDiagnostics: 'Після натискання «Діагностика»',
+  afterDiagnosticsNoNick: 'Після натискання «Діагностика» (немає ніка в Telegram)',
+  shareContactButton: 'Кнопка «Поділитися номером»',
+  contactReceived: 'Номер отримано',
   freeTextReply: 'Відповідь на вільне повідомлення',
+  ownerPhone: 'Ользі — номер телефону',
   ownerDiagnostics: 'Ользі — заявка на діагностику',
   ownerChatButton: 'Ользі — кнопка чату',
   ownerNoTgNick: 'Ользі — немає ніка в Telegram',
@@ -54,6 +58,21 @@ export const missingKeys = Object.values(KEYS).filter((title) => !sections[title
 if (missingKeys.length) {
   console.error('У texts/messages.md не знайдено розділів:', missingKeys.join(', '));
 }
+
+const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Те саме, що t(), але для повідомлень з HTML-розміткою (parse_mode: 'HTML').
+// Текст і дані екрануються; значення з rawHtml вставляються як готова розмітка (наприклад, посилання).
+export function tHtml(title, vars = {}, rawHtml = {}) {
+  const text = sections[title];
+  if (!text) return escapeHtml(`[немає тексту «${title}» у texts/messages.md]`);
+  return escapeHtml(text).replace(/\{(\w+)\}/g, (whole, key) => {
+    if (rawHtml[key] !== undefined) return rawHtml[key];
+    const v = vars[key];
+    return v === undefined || v === null || v === '' ? '—' : escapeHtml(v);
+  });
+}
+export { escapeHtml };
 
 // t(KEYS.greetingWithNick, { ig: 'nick' }) → готовий текст
 export function t(title, vars = {}) {
