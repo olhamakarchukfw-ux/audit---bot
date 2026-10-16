@@ -54,9 +54,10 @@ bot.command('id', (ctx) =>
   ctx.reply(`Твій Telegram ID: ${ctx.from.id}\n\nСкопіюй це число в Railway → Variables → OWNER_TELEGRAM_ID.`),
 );
 
-// /reset — лише для Ольги: стирає її власний запис, щоб пройти шлях від початку під час тестів.
+// /reset — лише для Ольги і тестових акаунтів (TESTER_TELEGRAM_IDS):
+// стирає власний запис, щоб пройти шлях від початку під час тестів.
 bot.command('reset', async (ctx) => {
-  if (!isOwner(ctx)) return;
+  if (!isOwner(ctx) && !config.testerIds.includes(ctx.from.id)) return;
   deletePerson(ctx.from.id);
   return ctx.reply('Твій запис у боті стерто. Можна тестувати з початку.');
 });

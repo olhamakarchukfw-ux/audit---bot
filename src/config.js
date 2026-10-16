@@ -15,6 +15,11 @@ export const config = {
   sheetsUrl: env.SHEETS_WEBHOOK_URL?.trim(),
   sheetsSecret: env.SHEETS_SECRET?.trim(),
   ownerId: env.OWNER_TELEGRAM_ID ? Number(env.OWNER_TELEGRAM_ID) : null,
+  // Додаткові акаунти, яким дозволено /reset для тестів (Telegram ID через кому)
+  testerIds: (env.TESTER_TELEGRAM_IDS || '')
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0),
   publicUrl: env.PUBLIC_URL?.trim().replace(/\/+$/, ''),
   botUsername: env.BOT_USERNAME?.trim().replace(/^@/, ''),
 
