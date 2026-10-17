@@ -86,7 +86,9 @@ async function runAudit(person) {
       content = buildProfileContent(profile, covers);
     }
 
-    const { analysis, messages } = await generateAudit(content);
+    // Якщо минула спроба обірвалась на ліміті довжини — просимо Claude думати коротше.
+    const truncatedBefore = (person.last_error || '').includes('max_tokens');
+    const { analysis, messages } = await generateAudit(content, truncatedBefore ? { effort: 'medium' } : {});
     const sendAt = computeSendAt(person.started_at || person.created_at);
     const updated = updatePerson(tg, {
       status: STATUS.READY,
@@ -94,6 +96,7 @@ async function runAudit(person) {
       messages: JSON.stringify(messages),
       send_at: sendAt,
       sent_parts: 0,
+      last_error: null,
     });
     console.log(`Аудит для @${person.ig} готовий (${messages.length} повідомл.), надсилання ${formatKyiv(sendAt)}`);
     syncRow(updated, { analysis: toPlainText(analysis), text: messages.map(toPlainText).join('\n\n———\n\n') });
@@ -117,7 +120,10 @@ async function runAudit(person) {
       syncRow(updated);
       await notifyAuditFailed(updated);
     } else {
-      updatePerson(tg, { attempts, last_error: lastError, next_try_at: Date.now() + attempts * 5 * MIN });
+      // Обрізану відповідь повторюємо одразу (з коротшими роздумами), інші збої — через 5 і 10 хв.
+      const delay = lastError.includes('max_tokens') ? 0 : attempts * 5 * MIN;
+      updatePerson(tg, { attempts, last_error: lastError, next_try_at: Date.now() + delay });
+      if (!delay) setTimeout(startAudit, 1000);
     }
   }
 }

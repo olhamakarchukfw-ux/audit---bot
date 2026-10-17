@@ -70,14 +70,23 @@ export function buildScreenshotsContent(ig, images) {
   ];
 }
 
-export async function generateAudit(content) {
-  const response = await getClient().messages.create({
+// effort: наскільки глибоко Claude «думає» перед відповіддю (high — за замовчуванням для Sonnet 5.5).
+// Роздуми рахуються в max_tokens, тому ліміт великий, а відповідь отримуємо потоком (stream),
+// щоб довгі запити не обривалися.
+export async function generateAudit(content, { effort = config.claudeEffort } = {}) {
+  const params = {
     model: config.claudeModel,
-    max_tokens: 16000,
+    max_tokens: config.claudeMaxTokens,
     thinking: { type: 'adaptive' },
     system: buildSystemPrompt(),
     messages: [{ role: 'user', content }],
-  });
+  };
+  if (effort) params.output_config = { effort };
+  const response = await getClient().messages.stream(params).finalMessage();
+  const u = response.usage || {};
+  console.log(
+    `Claude: effort=${effort || 'за замовчуванням'}, вхід ${u.input_tokens} ток., вихід ${u.output_tokens} ток., stop=${response.stop_reason}`,
+  );
   const text = response.content
     .filter((b) => b.type === 'text')
     .map((b) => b.text)

@@ -24,6 +24,8 @@ export const config = {
   botUsername: env.BOT_USERNAME?.trim().replace(/^@/, ''),
 
   claudeModel: env.CLAUDE_MODEL?.trim() || 'claude-sonnet-5-5',
+  claudeEffort: env.CLAUDE_EFFORT?.trim() || 'high',
+  claudeMaxTokens: num('CLAUDE_MAX_TOKENS', 48000),
   delayMin: num('DELAY_MIN_MINUTES', 120),
   delayMax: num('DELAY_MAX_MINUTES', 180),
   quietFrom: num('QUIET_FROM', 22),
