@@ -52,6 +52,7 @@ function ensureColumn(table, column, type) {
 ensureColumn('people', 'started_at', 'INTEGER');            // коли людина дала нік (від цього рахуємо 2–3 год)
 ensureColumn('people', 'sent_parts', 'INTEGER NOT NULL DEFAULT 0'); // скільки повідомлень аудиту вже надіслано
 ensureColumn('people', 'phone', 'TEXT');                     // номер, якщо людина ним поділилась
+ensureColumn('people', 'last_error', 'TEXT');                // причина останньої помилки аудиту
 
 // Внутрішні статуси і як вони пишуться в Google-таблиці
 export const STATUS = {
@@ -121,8 +122,13 @@ export function upsertPerson(from) {
 
 const UPDATABLE = new Set([
   'ig', 'status', 'analysis', 'messages', 'screenshots', 'attempts',
-  'next_try_at', 'send_at', 'sent_at', 'started_at', 'sent_parts', 'phone',
+  'next_try_at', 'send_at', 'sent_at', 'started_at', 'sent_parts', 'phone', 'last_error',
 ]);
+
+// Остання людина з цим ніком Instagram (для команди /retry)
+export function getPersonByIg(ig) {
+  return db.prepare('SELECT * FROM people WHERE ig = ? ORDER BY updated_at DESC LIMIT 1').get(ig) ?? null;
+}
 
 // Наступна людина, для якої настав час робити аудит
 export function nextAuditDue() {

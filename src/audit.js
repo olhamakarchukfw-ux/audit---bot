@@ -110,13 +110,14 @@ async function runAudit(person) {
     }
 
     const attempts = person.attempts + 1;
+    const lastError = String(e.message || e).slice(0, 300);
     console.error(`Аудит для @${person.ig} не вдався (спроба ${attempts}):`, e.message);
     if (attempts >= MAX_ATTEMPTS) {
-      const updated = updatePerson(tg, { status: STATUS.ERROR, attempts });
+      const updated = updatePerson(tg, { status: STATUS.ERROR, attempts, last_error: lastError });
       syncRow(updated);
       await notifyAuditFailed(updated);
     } else {
-      updatePerson(tg, { attempts, next_try_at: Date.now() + attempts * 5 * MIN });
+      updatePerson(tg, { attempts, last_error: lastError, next_try_at: Date.now() + attempts * 5 * MIN });
     }
   }
 }
@@ -153,7 +154,7 @@ async function sendAudit(person) {
     // 403/400: людина заблокувала бота або чату не існує — повтор не допоможе.
     if (e instanceof GrammyError && (e.error_code === 403 || e.error_code === 400)) {
       console.error(`Не вдалося надіслати аудит @${person.ig}:`, e.description);
-      const updated = updatePerson(tg, { status: STATUS.ERROR });
+      const updated = updatePerson(tg, { status: STATUS.ERROR, last_error: `Telegram: ${e.description}` });
       syncRow(updated);
       await notifyAuditFailed(updated);
     } else {

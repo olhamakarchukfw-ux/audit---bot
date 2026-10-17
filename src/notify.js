@@ -68,6 +68,20 @@ async function sendToOwner(person, text, extra) {
   }
 }
 
+// Зрозуміле пояснення найчастіших помилок + технічний текст для Claude.
+export function explainError(err) {
+  if (!err) return 'невідома';
+  const e = err.toLowerCase();
+  let hint = '';
+  if (e.includes('credit balance') || e.includes('billing')) hint = 'закінчився баланс Claude API (console.anthropic.com → Billing)';
+  else if (e.includes('apify') && (e.includes('402') || e.includes('usage') || e.includes('limit'))) hint = 'закінчився ліміт Apify (apify.com → Billing)';
+  else if (e.includes('apify') && (e.includes('408') || e.includes('timeout') || e.includes('timed out'))) hint = 'Apify не встиг прочитати сторінку';
+  else if (e.includes('401') || e.includes('authentication') || e.includes('invalid x-api-key')) hint = 'не приймається ключ (перевір ключі в Railway)';
+  else if (e.includes('overloaded') || e.includes('529')) hint = 'Claude був перевантажений';
+  else if (e.includes('telegram')) hint = 'не вдалося надіслати людині (можливо, вона заблокувала бота)';
+  return hint ? `${hint}. Технічно: ${err}` : err;
+}
+
 export function notifyAuditFailed(person) {
-  return notifyOwner(person, KEYS.ownerAuditFailed);
+  return notifyOwner(person, KEYS.ownerAuditFailed, { error: explainError(person.last_error) });
 }

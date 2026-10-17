@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { t, KEYS } from './texts.js';
 import {
   STATUS, getPerson, upsertPerson, updatePerson, deletePerson,
-  resolveStartCode, personByOwnerMessage, rememberOwnerMessage,
+  resolveStartCode, personByOwnerMessage, rememberOwnerMessage, getPersonByIg,
 } from './db.js';
 import { normalizeIg } from './nick.js';
 import { syncRow } from './sheets.js';
@@ -60,6 +60,21 @@ bot.command('reset', async (ctx) => {
   if (!isOwner(ctx) && !config.testerIds.includes(ctx.from.id)) return;
   deletePerson(ctx.from.id);
   return ctx.reply('Твій запис у боті стерто. Можна тестувати з початку.');
+});
+
+// /retry нік — лише для Ольги: запускає аудит для людини заново (після помилки чи щоб переробити).
+bot.command('retry', async (ctx) => {
+  if (!isOwner(ctx)) return;
+  const ig = normalizeIg(ctx.match || '');
+  if (!ig) return ctx.reply('Напиши нік після команди, наприклад: /retry olhamakarchuk');
+  const person = getPersonByIg(ig);
+  if (!person) return ctx.reply(`Не знайшла в боті людини з ніком @${ig}.`);
+  const updated = updatePerson(person.tg_id, {
+    status: STATUS.IN_WORK, attempts: 0, last_error: null, next_try_at: Date.now(), sent_parts: 0,
+  });
+  syncRow(updated);
+  startAudit();
+  return ctx.reply(`Запустила аудит для @${ig} заново. Він прийде людині за звичайним розкладом.`);
 });
 
 bot.command('start', async (ctx) => {
