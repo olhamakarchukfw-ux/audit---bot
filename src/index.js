@@ -9,6 +9,7 @@ const { createStartCode } = await import('./db.js');
 const { normalizeIg } = await import('./nick.js');
 const { bot } = await import('./bot.js');
 const { startWorker } = await import('./audit.js');
+const { startFollowups } = await import('./followups.js');
 
 // ---------- Веб-сервер ----------
 
@@ -70,6 +71,7 @@ async function startBot() {
 }
 startBot();
 startWorker();
+startFollowups();
 
 // Попередження в логах, якщо чогось не вистачає (бот при цьому працює).
 for (const [name, value] of [

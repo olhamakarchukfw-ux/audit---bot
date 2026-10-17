@@ -33,6 +33,13 @@ export const config = {
   timezone: env.TIMEZONE?.trim() || 'Europe/Kiev',
   dbPath: env.DB_PATH?.trim() || './data/bot.db',
 
+  // Дотиски після аудиту
+  channelUrl: env.CHANNEL_URL?.trim() || '',
+  remindAfterHours: num('REMIND_AFTER_HOURS', 24),
+  channelAfterReminderHours: num('CHANNEL_AFTER_REMINDER_HOURS', 48),
+  channelAfterDiagHours: num('CHANNEL_AFTER_DIAG_HOURS', 72),
+  askOwnerAfterHours: num('ASK_OWNER_AFTER_HOURS', 168), // через тиждень питаємо Ольгу, чи людина прийшла
+
   port: num('PORT', 3000),
 };
 

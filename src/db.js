@@ -53,6 +53,18 @@ ensureColumn('people', 'started_at', 'INTEGER');            // коли люди
 ensureColumn('people', 'sent_parts', 'INTEGER NOT NULL DEFAULT 0'); // скільки повідомлень аудиту вже надіслано
 ensureColumn('people', 'phone', 'TEXT');                     // номер, якщо людина ним поділилась
 ensureColumn('people', 'last_error', 'TEXT');                // причина останньої помилки аудиту
+ensureColumn('people', 'diag_at', 'INTEGER');                // коли натиснула «Діагностика»
+ensureColumn('people', 'reminder_at', 'INTEGER');            // коли надіслано нагадування про діагностику
+ensureColumn('people', 'channel_at', 'INTEGER');             // коли надіслано запрошення в канал
+ensureColumn('people', 'noshow', 'INTEGER NOT NULL DEFAULT 0'); // неявка на діагностику (див. NOSHOW)
+ensureColumn('people', 'followups', 'TEXT');                 // журнал дотисків
+ensureColumn('people', 'asked_at', 'INTEGER');               // коли бот запитав Ольгу, чи людина прийшла
+
+// Ті, хто натиснув «Діагностика» до появи дотисків: беремо час останнього оновлення.
+db.exec("UPDATE people SET diag_at = updated_at WHERE status = 'diagnostics' AND diag_at IS NULL");
+
+// Неявка на діагностику: через тиждень бот питає Ольгу; «Не прийшла» → бот нагадує людині.
+export const NOSHOW = { NONE: 0, FLAGGED: 1, REMINDED: 2, REBOOKED: 3 };
 
 // Внутрішні статуси і як вони пишуться в Google-таблиці
 export const STATUS = {
@@ -123,7 +135,42 @@ export function upsertPerson(from) {
 const UPDATABLE = new Set([
   'ig', 'status', 'analysis', 'messages', 'screenshots', 'attempts',
   'next_try_at', 'send_at', 'sent_at', 'started_at', 'sent_parts', 'phone', 'last_error',
+  'diag_at', 'reminder_at', 'channel_at', 'noshow', 'followups', 'asked_at',
 ]);
+
+// ---------- Дотиски ----------
+
+// Не натиснули «Діагностика»: нагадування через remindMs після надсилання аудиту
+export function dueReminders(remindMs) {
+  return db
+    .prepare('SELECT * FROM people WHERE status = ? AND reminder_at IS NULL AND sent_at <= ?')
+    .all(STATUS.SENT, Date.now() - remindMs);
+}
+
+// Позначені як «не прийшла», ще без пропозиції іншого часу
+export function dueNoshowReminders() {
+  return db.prepare('SELECT * FROM people WHERE status = ? AND noshow = ?').all(STATUS.DIAGNOSTICS, NOSHOW.FLAGGED);
+}
+
+// Запрошення в канал: без заявки — через afterReminderMs після нагадування; із заявкою — через afterDiagMs
+export function dueChannelInvites(afterReminderMs, afterDiagMs) {
+  const nowMs = Date.now();
+  return db
+    .prepare(
+      `SELECT * FROM people WHERE channel_at IS NULL AND (
+         (status = ? AND reminder_at IS NOT NULL AND reminder_at <= ?) OR
+         (status = ? AND diag_at IS NOT NULL AND diag_at <= ?)
+       )`,
+    )
+    .all(STATUS.SENT, nowMs - afterReminderMs, STATUS.DIAGNOSTICS, nowMs - afterDiagMs);
+}
+
+// Натиснули «Діагностика» askMs тому, а Ольгу ще не питали, чи людина прийшла
+export function dueOwnerQuestions(askMs) {
+  return db
+    .prepare('SELECT * FROM people WHERE status = ? AND asked_at IS NULL AND diag_at IS NOT NULL AND diag_at <= ?')
+    .all(STATUS.DIAGNOSTICS, Date.now() - askMs);
+}
 
 // Остання людина з цим ніком Instagram (для команди /retry)
 export function getPersonByIg(ig) {

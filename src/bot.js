@@ -3,12 +3,13 @@ import { Bot, GrammyError, HttpError } from 'grammy';
 import { config } from './config.js';
 import { t, KEYS } from './texts.js';
 import {
-  STATUS, getPerson, upsertPerson, updatePerson, deletePerson,
+  STATUS, NOSHOW, getPerson, upsertPerson, updatePerson, deletePerson,
   resolveStartCode, personByOwnerMessage, rememberOwnerMessage, getPersonByIg,
 } from './db.js';
 import { normalizeIg } from './nick.js';
 import { syncRow } from './sheets.js';
 import { startAudit } from './audit.js';
+import { handleOwnerAnswer } from './followups.js';
 import { setApi, notifyOwner, doneKeyboard, shareContactKeyboard } from './notify.js';
 
 export const bot = new Bot(config.botToken);
@@ -110,8 +111,16 @@ bot.callbackQuery('diag', async (ctx) => {
   await ctx.answerCallbackQuery();
   const person = getPerson(ctx.from.id) || upsertPerson(ctx.from);
   const hasNick = Boolean(person.tg_username);
-  if (person.status !== STATUS.DIAGNOSTICS) {
-    const updated = updatePerson(person.tg_id, { status: STATUS.DIAGNOSTICS });
+  // Повторна заявка — після того, як Ольга позначила неявку і бот запропонував інший час.
+  const rebooking = person.status === STATUS.DIAGNOSTICS && person.noshow === NOSHOW.REMINDED;
+  if (person.status !== STATUS.DIAGNOSTICS || rebooking) {
+    const updated = updatePerson(person.tg_id, {
+      status: STATUS.DIAGNOSTICS,
+      // Після повторної заявки цикл починається заново: через тиждень бот знову запитає Ольгу.
+      diag_at: Date.now(),
+      asked_at: null,
+      noshow: NOSHOW.NONE,
+    });
     syncRow(updated);
     const extra = hasNick
       ? {
@@ -120,11 +129,31 @@ bot.callbackQuery('diag', async (ctx) => {
           },
         }
       : {};
-    await notifyOwner(updated, KEYS.ownerDiagnostics, {}, extra, hasNick ? null : KEYS.ownerNoTgNick);
+    await notifyOwner(
+      updated,
+      rebooking ? KEYS.ownerRebooking : KEYS.ownerDiagnostics,
+      {},
+      extra,
+      hasNick ? null : KEYS.ownerNoTgNick,
+    );
   }
   // Без ніка в Telegram просимо поділитися номером (кнопка внизу екрана).
   if (hasNick) return ctx.reply(t(KEYS.afterDiagnostics));
   return ctx.reply(t(KEYS.afterDiagnosticsNoNick), { reply_markup: shareContactKeyboard() });
+});
+
+// Ольга відповідає на питання бота «Чи прийшла людина на діагностику?»
+bot.callbackQuery(/^(came|noshow):(\d+)$/, async (ctx) => {
+  if (!isOwner(ctx)) return ctx.answerCallbackQuery();
+  const [, answer, tgId] = ctx.match;
+  const note = handleOwnerAnswer(Number(tgId), answer === 'came');
+  await ctx.answerCallbackQuery({ text: note || 'Людину не знайдено' });
+  if (!note) return;
+  // Прибираємо кнопки і дописуємо відповідь під питанням.
+  const original = ctx.callbackQuery.message;
+  await ctx
+    .editMessageText(`${original.text}\n\n${note}`, { entities: original.entities, link_preview_options: { is_disabled: true } })
+    .catch(() => ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {}));
 });
 
 // ---------- Повідомлення ----------
