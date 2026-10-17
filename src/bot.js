@@ -116,10 +116,8 @@ bot.callbackQuery('diag', async (ctx) => {
   if (person.status !== STATUS.DIAGNOSTICS || rebooking) {
     const updated = updatePerson(person.tg_id, {
       status: STATUS.DIAGNOSTICS,
-      // Після повторної заявки цикл починається заново: через тиждень бот знову запитає Ольгу.
-      diag_at: Date.now(),
-      asked_at: null,
-      noshow: NOSHOW.NONE,
+      // Повторна заявка — останній крок: бот більше не питає Ольгу і не нагадує людині.
+      ...(rebooking ? { noshow: NOSHOW.REBOOKED } : { diag_at: Date.now() }),
     });
     syncRow(updated);
     const extra = hasNick
