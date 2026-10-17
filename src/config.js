@@ -34,7 +34,7 @@ export const config = {
   dbPath: env.DB_PATH?.trim() || './data/bot.db',
 
   // Дотиски після аудиту
-  channelUrl: env.CHANNEL_URL?.trim() || '',
+  channelUrl: env.CHANNEL_URL?.trim() || 'https://t.me/blognamilion',
   remindAfterHours: num('REMIND_AFTER_HOURS', 24),
   channelAfterReminderHours: num('CHANNEL_AFTER_REMINDER_HOURS', 48),
   channelAfterDiagHours: num('CHANNEL_AFTER_DIAG_HOURS', 72),
